@@ -1,0 +1,127 @@
+---
+title: "Personal Income"
+author: "Stephen Wang"
+date: "25/09/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr) #data manipulation
+library(tidyr) #tidying data 
+library(readr) #reading files 
+library(ggplot2) #data visualisation
+library(purrr) #toolkit for functions and vectors
+library(stringr) #string manipulation
+library(reshape2) #reshaping data
+library(ggcorrplot) #correlation matrixes
+```
+
+Hypothesis: from general knowledge living in Auckland, I assume house price is associated with room, size, distance to CBD, and time of construction. 
+
+
+```{r}
+filename = "melbourne_house_prices.csv"
+house_price <- read_csv(filename)
+dim(house_price)
+head(house_price, 10)
+tail(house_price, 10)
+summary(house_price)
+```
+
+Dimension: 34,857 rows x 21 columns 
+
+Since there are 21 columns, I will just be picking the variables relevant to our study. 
+
+Rooms:
+Price: minimum is $85,000 so that's good - there's no 0 value houses! 
+Distance:
+Bedroom2:
+Bathroom:
+Car:
+Landsize:
+BuildingArea:
+YearBuilt:
+
+
+```{r}
+round(colSums(is.na(house_price)) / nrow(house_price) * 100, digits = 2)
+```
+
+This shows the proportion of missing data (NA values) in our dataset. 
+
+Before we continue, let's understand the nature of missing data values. 
+(a) Why does it occur?
+(b) How can this affect the study?
+(c) What can we do?
+
+Missing values can be a result of multiple factors. The data source may not actually have some of the data, people being surveyed don't want to disclose some personal information, some variables don't satisfy the data e.g. apartment don't have landsize. 
+
+There are three types of missing data:
+MCAR - missing completely at random
+MAR - missing at random
+MNAR - missing not at random
+
+Missing data can reduce the statistical power of a study and can produce biased estimates, leading to invalid conclusions. 
+
+What solutions do we have?
+(1) Deletion: Remove rows with null variables
+(2) Multiple Imputation: Replacing null values with plausible values based on the correlations for the missing data and then averages the simulated datasets by incorporating random errors in your predictions
+
+From our null value proportions, we can noticeably see that some of the variables have too much missing data values. Building area has 60.58% missing data, YearBuilt has 55.39% missing data, etc, and these variables are argubly important for regression. 
+
+Reference: 
+- https://www.r-bloggers.com/imputing-missing-data-with-r-mice-package/
+- https://measuringu.com/handle-missing-data/#targetText=Use%20caution%20unless%20you%20have,value%20from%20the%20other%20values
+- https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3668100/#targetText=Missing%20data%20can%20reduce%20the,estimates%2C%20leading%20to%20invalid%20conclusions.&targetText=The%20problem%20of%20missing%20data,from%20the%20data%20%5B1%5D.
+
+
+
+```{r}
+null_rows <- house_price %>% filter(is.na(house_price$Price))
+removed_null_price <- house_price %>% select(-YearBuilt) %>% filter(!is.na(house_price$Price), !is.na(house_price$Landsize), !is.na(house_price$BuildingArea))  
+round(colSums(is.na(removed_null_price)) / nrow(removed_null_price) * 100, digits = 2)
+```
+
+21.83% of data has missing values for price which is beyond the 5% threshold to imputate values. So we're going to remove rows with NA values. (We will do a time-series analysis later so we are going to remove the YearBuilt column.)
+
+After deletion of data, our dimension is 9382 rows x 20 columns. 
+
+```{r}
+ggplot(data=removed_null_price,
+       aes(Price))+
+  geom_histogram()
+
+# removed_null_price <- removed_null_price %>% mutate(Price=log10(Price))
+
+ggplot(data=removed_null_price,
+       aes(Price))+
+  geom_histogram()
+```
+
+Our variable of interest (or dependent variable) is Price so I wanted to check out the price distribution of this dataset. The data is right skewed so we need to log transform price to fix the skewness. This is also better for our study because we are interested in percentage change. 
+
+```{r}
+numeric_data <- removed_null_price %>% select_if(is.numeric)
+corr <- numeric_data %>% cor(use="pairwise.complete.obs")
+ggcorrplot(corr, hc.order = TRUE, type = "lower",
+   outline.col = "black",
+   colors = c("#6D9EC1", "white", "#E46726"),
+   insig = "blank")
+
+#ggplot(data=removed_null_price,
+       #aes(x=as.factor(Rooms), y=Price))+
+  #geom_boxplot()
+```
+
+```{r}
+linear_model <- glm(formula=log(Price)~Rooms*Bathroom+Distance, data=removed_null_price)
+summary(linear_model)
+confint(linear_model)
+```
+
+Ok I need to figure out how to fit models. 
+
+Note to self:
+select() -> columns
+filter() -> rows 
