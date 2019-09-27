@@ -17,7 +17,11 @@ library(reshape2) #reshaping data
 library(ggcorrplot) #correlation matrixes
 ```
 
-Hypothesis: from general knowledge living in Auckland, I assume house price is associated with room, size, distance to CBD, and time of construction. 
+There have been recent speculation of a house bubble about to burst in Oceania (Australia and NZ). With low interest rates and a declining house economy, this could be a once in a lifetime opportunity. For this project, I wanted to investigate the factors that affect house prices. 
+
+Hypothesis: the variables that affects the price the most is location (distance from CBD), number of rooms, and landsize. 
+
+The data was downlodaded from: https://www.kaggle.com/anthonypino/melbourne-housing-market#Melbourne_housing_FULL.csv
 
 
 ```{r}
@@ -33,18 +37,32 @@ Dimension: 34,857 rows x 21 columns
 
 Since there are 21 columns, I will just be picking the variables relevant to our study. 
 
-Rooms:
-Price: minimum is $85,000 so that's good - there's no 0 value houses! 
-Distance:
-Bedroom2:
-Bathroom:
-Car:
-Landsize:
-BuildingArea:
-YearBuilt:
+Rooms: total rooms in house 
+Price: price sold 
+Distance: distance from cbd
+Bedroom2: total number of bedrooms 
+Bathroom: total number of bathrooms
+Car: number of cars that can be parked
+Landsize: landsize in m2
+BuildingArea: building area in m2
+YearBuilt: year constructed
+Postcode/CouncilArea: these two are related; each postcode is associated with a council area 
+
+Observations:
+- Minimum price is $85,000 so that's good - there's no 0 value houses. 
+- Maximum price is a whopping $11,200,000. 
+- If we take a look at the histogram of distance, majority of houses are between 6.4km and 14km from CBD. Straight off the bat, this means that houses in rural areas are not on the market or not being sold or a biased data collection. 
+- Rooms are defined to be used for habitation while bedrooms are intended for sleeping. Rooms include bedrooms, kitchens, living rooms, etc. The distinction between rooms and bedrooms is defined here: http://archive.stats.govt.nz/methods/classifications-and-standards/classification-related-stats-standards/number-of-rooms-bedrooms/definition.aspx
 
 
 ```{r}
+# Cleaning up some data  
+house_price$Postcode <- as.factor(house_price$Postcode)
+```
+
+
+```{r}
+# Checking for NA values
 round(colSums(is.na(house_price)) / nrow(house_price) * 100, digits = 2)
 ```
 
@@ -114,13 +132,43 @@ ggcorrplot(corr, hc.order = TRUE, type = "lower",
   #geom_boxplot()
 ```
 
+There are two personal conundrums for this investigation: 
+(1) I need to understand the fundamentals of multiple linear regression
+(2) And I need to figure out the difference between a generalised linear model (glm) and linear model (lm) for R programming. 
+
+Multiple linear regression involves fitting two or more explanatory variables to explain the response variable, in this case, Melbourne house prices. We need to first check the scatter plot of our variables to see if there is a discernible linear relationship. 
+
+The lm (linear model) fits the model in the form of y = xb + e where e~iid(0, s^2)
+The glm fits the model in the form of g(y) = xb + e where the function g and e needs to be specified. This is known as the link function which transforms a non-linear regression to linear. 
+
+References:
+https://garrettgman.github.io/model-fitting/
+http://www.stat.yale.edu/Courses/1997-98/101/linmult.htm
+https://www.reddit.com/r/rstats/comments/2izyw1/difference_between_glm_and_lm_lmyxz_and_glmyxz/
+
+
 ```{r}
-linear_model <- glm(formula=log(Price)~Rooms*Bathroom+Distance, data=removed_null_price)
+selected <- numeric_data[,c(1:3, 5:7)]
+selected$Price <- log10(selected$Price)
+plot(selected)
+```
+
+```{r}
+linear_model <- lm(formula=Price~Rooms+Bathroom+Distance+Bedroom2+Car, data=selected)
 summary(linear_model)
 confint(linear_model)
 ```
 
-Ok I need to figure out how to fit models. 
+In this scenario, I logged price seperately and fitted a linear regression model using a temporary dataframe. 
+The selected variables and fitted model are all statistically significant but our R-squared value suggests that our model can only explain 46.85% of variance for house prices. 
+
+```{r}
+# Attempt number two: putting all the variables 
+linear_model_2 <- lm(formula=log(Price)~Rooms+Bathroom+Distance+Bedroom2+Car+Landsize+BuildingArea+CouncilArea+Type+Method, data=removed_null_price)
+summary(linear_model_2)
+confint(linear_model_2)
+```
+
 
 Note to self:
 select() -> columns
