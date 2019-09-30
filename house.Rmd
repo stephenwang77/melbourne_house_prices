@@ -47,6 +47,8 @@ Landsize: landsize in m2
 BuildingArea: building area in m2
 YearBuilt: year constructed
 Postcode/CouncilArea: these two are related; each postcode is associated with a council area 
+Method: s =, sa =, sp = vb = 
+Type: t = townhouse, u = unit 
 
 Observations:
 - Minimum price is $85,000 so that's good - there's no 0 value houses. 
@@ -115,6 +117,7 @@ ggplot(data=removed_null_price,
 ggplot(data=removed_null_price,
        aes(Price))+
   geom_histogram()
+   
 ```
 
 Our variable of interest (or dependent variable) is Price so I wanted to check out the price distribution of this dataset. The data is right skewed so we need to log transform price to fix the skewness. This is also better for our study because we are interested in percentage change. 
@@ -164,10 +167,38 @@ The selected variables and fitted model are all statistically significant but ou
 
 ```{r}
 # Attempt number two: putting all the variables 
-linear_model_2 <- lm(formula=log(Price)~Rooms+Bathroom+Distance+Bedroom2+Car+Landsize+BuildingArea+CouncilArea+Type+Method, data=removed_null_price)
+linear_model_2 <- lm(formula=log(Price)~Rooms+Bathroom+Distance+Bedroom2+Car+CouncilArea+Type+Method, data=removed_null_price)
 summary(linear_model_2)
 confint(linear_model_2)
 ```
+
+After we included some more variables to the linear model equation, the R-squared value increased from 0.4682 to 0.762. However, there were three council areas (Hobson Bay, Moorabool Shire, and Millumbik Shire) and two methods (SA and VB) with no statistical significance. I wanted to take a closer look at these two variables. 
+
+```{r}
+flagged_council <- removed_null_price %>% mutate(flag=
+                                                    ifelse(CouncilArea=="Hobsons Bay City Council" | CouncilArea=="Moorabool Shire Council" | CouncilArea=="Nillumbik Shire Council", "TRUE", "FALSE"))
+
+ggplot(data=flagged_council,
+       aes(CouncilArea,
+           fill=flag))+
+   geom_bar(stat="count")+
+   theme(axis.text.x=element_text(angle=45,hjust=1))
+   scale_fill_manual(c("TRUE"="red", "FALSE"="black"),guide=FALSE)
+```
+
+Small sample sizes make it harder to find statistical significance which is present in Moorabool Shire and Nillumbik Shire. Hobson Bay has an approximate 300 sample size so we can confirm that this location doesn't have statistical signifiance - the price when taking Hobson Bay into account is attributed to chance. 
+
+The article suggests that "when we do find statistical significance with small sample sizes, the differences are large and more likely to drive action". Sometimes statistical significance does not translate to practical significance i.e. a miniscule effect on the dependent variable. 
+
+Reference:
+https://measuringu.com/statistically-significant/#targetText=Not%20Due%20to%20Chance,result%20that%20large%20or%20larger
+https://stats.idre.ucla.edu/other/mult-pkg/faq/general/faqhow-do-i-interpret-a-regression-model-when-some-variables-are-log-transformed/
+
+
+
+Summary: 
+It's hard to imagine how there is a low correlation between Landsize/BuildingArea and price. 
+
 
 
 Note to self:
